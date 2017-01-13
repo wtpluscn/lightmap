@@ -1,0 +1,100 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf8" />
+<script src="./qwebchannel.js"></script>
+<style type="text/css">
+    html,body{height:100%;width:100%;margin:0px;padding:0px;}
+    #map{height:100%;width:100%;}}
+</style>
+<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=9GqzBZjfGqXYXMzdfuRN9AL4B4PHaY6R"></script>
+</head>
+<body>
+    <div id="map"></div>
+</body>
+</html>
+<script type="text/javascript">
+    var map = new BMap.Map("map",{minZoom:5,maxZoom:18,enableMapClick:false});
+    map.centerAndZoom("烟台",12);
+    
+    map.enableDragging();
+    map.enableScrollWheelZoom();
+    map.disableDoubleClickZoom();
+    var ctrlNav = new BMap.NavigationControl({anchor:BMAP_ANCHOR_TOP_LEFT,type:BMAP_NAVIGATION_CONTROL_LARGE});
+    map.addControl(ctrlNav);
+    map.setMapStyle({style:"light"});
+	
+      new QWebChannel(qt.webChannelTransport, function(channel) {
+        window.bridge = channel.objects.bridge;	
+		
+		window.bridge.GetLightData(function(returnValue){
+		initMarker(returnValue);
+		});	
+		
+        window.bridge.sigUpdateLight.connect(function() {
+			window.bridge.GetLightData(function(returnValue){
+			initMarker(returnValue);
+			});
+        });
+		
+        window.bridge.sigLightStatus.connect(function(name,value) {
+			var lays = map.getOverlays();
+			for(var i=0; i<lays.length; i++){
+			var marker = lays[i];
+			if(marker.getTitle() == name){
+				var myIcon = new BMap.Icon(value==0?"circle_grey.png":"circle_green.png",new BMap.Size(32,32),{offset:new BMap.Size(10,25),imageOffset:new BMap.Size(0,0)});
+				marker.setIcon(myIcon);		
+				}
+			}
+        });
+		
+      });
+	  
+	
+	
+    function initMarker(markerArr) {
+	
+    for (var i = 0; i < markerArr.length; i++) {
+        var p = markerArr[i].point.split(",");
+        var p0 = p[0];
+        var p1 = p[1];
+        var marker = addMarker(new window.BMap.Point(p0,p1),markerArr[i],i);
+        addInfoWindow(marker,markerArr[i]);
+    }
+	}
+    function addMarker(point,poi,index) {
+        var myIcon = new BMap.Icon(poi.value==0?"circle_grey.png":"circle_green.png",new BMap.Size(32,32),{offset:new BMap.Size(10,25),imageOffset:new BMap.Size(0,0)});
+        var marker = new BMap.Marker(point,{icon:myIcon});
+        var label = new BMap.Label(poi.name,{"offset":new BMap.Size(20,-10)});
+        //marker.setLabel(label);
+		marker.setTitle(poi.name);
+        map.addOverlay(marker);
+        return marker;
+    }
+    function addInfoWindow(marker,poi){
+        var title = '<div style="color:#CE5521;">' + poi.description + '</div>';
+        var html = [];
+        html.push('<table>');
+        html.push('<tr style="vertical-align:top;line-height:25px;font-size:12px;"><td style="white-space:nowrap;word-break:keep-all;">Name</td><td>' + poi.name + '</td></tr>');
+        html.push('<tr style="vertical-align:top;line-height:25px;font-size:12px;"><td style="white-space:nowrap;word-break:keep-all;">Description</td><td>' + poi.description + '</td></tr>');
+        html.push('<tr style="vertical-align:top;line-height:25px;font-size:12px;"><td style="white-space:nowrap;word-break:keep-all;">Point</td><td>' + poi.point + '</td></tr>');
+        html.push('</tr></table>');
+        var infoWindow = new BMap.InfoWindow(html.join(""),{title:title,width:60});
+        var openInfoWinFun = function () {marker.openInfoWindow(infoWindow);};
+        marker.addEventListener("click",openInfoWinFun);
+		var menuFunc = function (){
+		var markerMenu=new BMap.ContextMenu();
+			var onMarker = function(e,ee,marker){ 
+			bridge.onLightOn(marker.getTitle());
+			};
+			var offMarker = function(e,ee,marker){ 
+			bridge.onLightOff(marker.getTitle());
+			};
+		markerMenu.addItem(new BMap.MenuItem('亮灯',onMarker.bind(marker)));
+		markerMenu.addItem(new BMap.MenuItem('关灯',offMarker.bind(marker)));
+		marker.addContextMenu(markerMenu);
+		};
+        marker.addEventListener("rightclick",menuFunc);
+		
+        return openInfoWinFun;
+    }
+</script>
